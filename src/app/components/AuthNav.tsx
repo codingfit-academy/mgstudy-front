@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./AuthNav.module.css";
@@ -11,26 +10,20 @@ import {
   logout,
   DEFAULT_AVATAR,
 } from "../lib/localAuth";
+import { useClientValue } from "../lib/useClientValue";
 
 export default function AuthNav() {
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
-  const [nickname, setNickname] = useState<string | null>(null);
-  const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
-
-  useEffect(() => {
-    setLoggedIn(isLoggedIn());
-    setEmail(getCurrentEmail());
-    const account = getAccount();
-    setNickname(account?.nickname ?? null);
-    setAvatar(account?.avatar ?? DEFAULT_AVATAR);
-  }, []);
+  const loggedIn = useClientValue(() => isLoggedIn(), false);
+  const email = useClientValue(() => getCurrentEmail(), null);
+  const nickname = useClientValue(() => getAccount()?.nickname ?? null, null);
+  const avatar = useClientValue(
+    () => getAccount()?.avatar ?? DEFAULT_AVATAR,
+    DEFAULT_AVATAR
+  );
 
   function handleLogout() {
     logout();
-    setLoggedIn(false);
-    setEmail(null);
     router.push("/");
   }
 

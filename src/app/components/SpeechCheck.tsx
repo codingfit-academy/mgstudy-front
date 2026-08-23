@@ -4,6 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./SpeechCheck.module.css";
 import { playErrorBeep, playSuccessDing } from "./sound";
 
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  length: number;
+  [index: number]: { transcript: string };
+};
+
+type SpeechRecognitionEventLike = {
+  results: {
+    length: number;
+    [index: number]: SpeechRecognitionResultLike;
+  };
+};
+
 type SpeechRecognitionLike = {
   lang: string;
   interimResults: boolean;
@@ -11,7 +24,7 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   start: () => void;
   stop: () => void;
-  onresult: ((event: any) => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onend: (() => void) | null;
   onerror: (() => void) | null;
 };

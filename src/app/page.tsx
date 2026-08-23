@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import AuthNav from "./components/AuthNav";
@@ -11,6 +11,20 @@ import {
   type HistoryEntry,
 } from "./lib/localAuth";
 import { suggestAdvancedQuestion } from "./lib/advancedQuestions";
+import { useClientValue } from "./lib/useClientValue";
+
+function getReviewItems(): HistoryEntry[] {
+  if (!isLoggedIn()) return [];
+  const seen = new Set<string>();
+  const unique: HistoryEntry[] = [];
+  for (const entry of getHistory()) {
+    if (seen.has(entry.question)) continue;
+    seen.add(entry.question);
+    unique.push(entry);
+    if (unique.length >= 3) break;
+  }
+  return unique;
+}
 
 const EXAMPLE_QUESTIONS = [
   "공룡은 왜 사라졌어?",
@@ -79,22 +93,9 @@ export default function Home() {
   const router = useRouter();
   const [age, setAge] = useState("");
   const [question, setQuestion] = useState("");
-  const [reviewItems, setReviewItems] = useState<HistoryEntry[]>([]);
+  const reviewItems = useClientValue(getReviewItems, []);
 
   const canSubmit = age.trim() !== "" && question.trim() !== "";
-
-  useEffect(() => {
-    if (!isLoggedIn()) return;
-    const seen = new Set<string>();
-    const unique: HistoryEntry[] = [];
-    for (const entry of getHistory()) {
-      if (seen.has(entry.question)) continue;
-      seen.add(entry.question);
-      unique.push(entry);
-      if (unique.length >= 3) break;
-    }
-    setReviewItems(unique);
-  }, []);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

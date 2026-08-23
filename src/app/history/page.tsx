@@ -1,39 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import AuthNav from "../components/AuthNav";
-import {
-  isLoggedIn,
-  getCurrentEmail,
-  getHistory,
-  type HistoryEntry,
-} from "../lib/localAuth";
+import { isLoggedIn, getCurrentEmail, getHistory } from "../lib/localAuth";
+import { useClientValue } from "../lib/useClientValue";
 
 export default function HistoryPage() {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const loggedIn = useClientValue(() => isLoggedIn(), false);
+  const email = useClientValue(() => getCurrentEmail(), null);
+  const history = useClientValue(() => getHistory(), []);
 
   useEffect(() => {
-    if (!isLoggedIn()) {
+    if (!loggedIn) {
       router.replace("/login");
-      return;
     }
-    setEmail(getCurrentEmail());
-    setHistory(getHistory());
-    setReady(true);
-  }, [router]);
+  }, [loggedIn, router]);
 
   function askAgain(question: string) {
     sessionStorage.setItem("mgstudy:question", question);
     router.push("/analyze");
   }
 
-  if (!ready) return null;
+  if (!loggedIn) return null;
 
   return (
     <div className={styles.page}>

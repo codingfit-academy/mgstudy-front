@@ -36,10 +36,19 @@ export default function Fireworks({ trigger }: { trigger: number }) {
 
   useEffect(() => {
     if (!trigger) return;
-    setParticles(makeParticles());
-    setShow(true);
+    let cancelled = false;
+    // Deferred to a microtask so the state updates happen in a callback
+    // rather than synchronously in the effect body.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setParticles(makeParticles());
+      setShow(true);
+    });
     const t = setTimeout(() => setShow(false), DURATION_MS);
-    return () => clearTimeout(t);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [trigger]);
 
   if (!show) return null;

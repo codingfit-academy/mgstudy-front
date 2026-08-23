@@ -14,6 +14,9 @@ import { roParticle } from "./korean";
 import Fireworks from "../components/Fireworks";
 import SpeechCheck from "../components/SpeechCheck";
 import { playErrorBeep } from "../components/sound";
+import { useClientValue } from "../lib/useClientValue";
+
+const DEFAULT_FRAMEWORK_ID = "oheukwonchik";
 
 const MANUSCRIPT_COLUMNS = 10;
 
@@ -27,31 +30,25 @@ function stateOf(stepIndex: number, current: number): StepState {
 
 export default function SolvePage() {
   const router = useRouter();
-  const [question, setQuestion] = useState(DEFAULT_QUESTION);
-  const [frameworkId, setFrameworkId] = useState("oheukwonchik");
+  const question = useClientValue(
+    () => sessionStorage.getItem("mgstudy:question") || DEFAULT_QUESTION,
+    DEFAULT_QUESTION
+  );
+  const frameworkId = useClientValue(() => {
+    const stored = sessionStorage.getItem("mgstudy:framework");
+    return stored && FRAMEWORKS[stored] ? stored : DEFAULT_FRAMEWORK_ID;
+  }, DEFAULT_FRAMEWORK_ID);
   const [current, setCurrent] = useState(0);
   const framework = FRAMEWORKS[frameworkId] ?? FRAMEWORKS.oheukwonchik;
   const quizzes = framework.quizzes;
 
-  const [choices, setChoices] = useState<(string | null)[]>(
-    quizzes.map(() => null)
-  );
-  const [wrongFlags, setWrongFlags] = useState<boolean[]>(
-    quizzes.map(() => false)
-  );
+  // Sized lazily as answers come in rather than pre-sized to `quizzes.length`,
+  // since `frameworkId` above can swap from the SSR fallback to the real
+  // stored value right after hydration — every read of these arrays already
+  // tolerates missing/undefined entries, so no fixed size is needed.
+  const [choices, setChoices] = useState<(string | null)[]>([]);
+  const [wrongFlags, setWrongFlags] = useState<boolean[]>([]);
   const [celebrate, setCelebrate] = useState(0);
-
-  useEffect(() => {
-    const storedQuestion = sessionStorage.getItem("mgstudy:question");
-    if (storedQuestion) setQuestion(storedQuestion);
-    const storedFramework = sessionStorage.getItem("mgstudy:framework");
-    if (storedFramework && FRAMEWORKS[storedFramework]) {
-      const resolved = FRAMEWORKS[storedFramework];
-      setFrameworkId(storedFramework);
-      setChoices(resolved.quizzes.map(() => null));
-      setWrongFlags(resolved.quizzes.map(() => false));
-    }
-  }, []);
 
   function selectOption(quizIndex: number, optionId: string) {
     setChoices((prev) => {
