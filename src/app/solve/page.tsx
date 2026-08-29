@@ -15,6 +15,9 @@ import Fireworks from "../components/Fireworks";
 import SpeechCheck from "../components/SpeechCheck";
 import { playErrorBeep } from "../components/sound";
 import { useClientValue } from "../lib/useClientValue";
+import { composeQuestion } from "../lib/ai";
+
+const CUSTOM_OPTION_ID = "custom";
 
 const DEFAULT_FRAMEWORK_ID = "oheukwonchik";
 
@@ -47,6 +50,7 @@ export default function SolvePage() {
   // stored value right after hydration — every read of these arrays already
   // tolerates missing/undefined entries, so no fixed size is needed.
   const [choices, setChoices] = useState<(string | null)[]>([]);
+  const [customTexts, setCustomTexts] = useState<string[]>([]);
   const [wrongFlags, setWrongFlags] = useState<boolean[]>([]);
   const [celebrate, setCelebrate] = useState(0);
 
@@ -63,9 +67,21 @@ export default function SolvePage() {
     });
   }
 
+  function setCustomText(quizIndex: number, text: string) {
+    setCustomTexts((prev) => {
+      const next = [...prev];
+      next[quizIndex] = text;
+      return next;
+    });
+  }
+
   function checkQuiz(quizIndex: number) {
     const quiz = quizzes[quizIndex];
-    const isCorrect = choices[quizIndex] === quiz.correctId;
+    const chosenId = choices[quizIndex];
+    const isCorrect =
+      chosenId === CUSTOM_OPTION_ID
+        ? (customTexts[quizIndex] ?? "").trim() !== ""
+        : chosenId === quiz.correctId;
     setWrongFlags((prev) => {
       const next = [...prev];
       next[quizIndex] = !isCorrect;
@@ -80,10 +96,44 @@ export default function SolvePage() {
   const allDone = current >= quizzes.length;
   const assembledValues = quizzes.map((quiz, i) => {
     const chosenId = choices[i];
+    if (chosenId === CUSTOM_OPTION_ID) return (customTexts[i] ?? "").trim();
     const option = quiz.options.find((o) => o.id === chosenId);
     return option ? option.value : "";
   });
-  const assembledQuestion = framework.buildQuestion(assembledValues);
+  const localAssembledQuestion = framework.buildQuestion(assembledValues);
+
+  const [aiQuestion, setAiQuestion] = useState<string | null>(null);
+  const [composeFailed, setComposeFailed] = useState(false);
+  const composing = allDone && aiQuestion === null && !composeFailed;
+  const assembledQuestion = aiQuestion ?? localAssembledQuestion;
+
+  useEffect(() => {
+    if (!allDone || aiQuestion !== null || composeFailed) return;
+    let cancelled = false;
+    composeQuestion({
+      originalQuestion: question,
+      frameworkLabel: framework.label,
+      answers: assembledValues,
+    })
+      .then((composed) => {
+        if (!cancelled) setAiQuestion(composed);
+      })
+      .catch(() => {
+        if (!cancelled) setComposeFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allDone]);
+
+  function speakQuestion() {
+    if (!("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(assembledQuestion);
+    utterance.lang = "ko-KR";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }
 
   const [retypedText, setRetypedText] = useState("");
   const [retypeWrong, setRetypeWrong] = useState(false);
@@ -95,10 +145,10 @@ export default function SolvePage() {
   const lastCheckedLengthRef = useRef(0);
 
   useEffect(() => {
-    if (allDone && !retypeDone) {
+    if (allDone && !composing && !retypeDone) {
       manuscriptInputRef.current?.focus();
     }
-  }, [allDone, retypeDone]);
+  }, [allDone, composing, retypeDone]);
 
   useEffect(() => {
     if (!shake) return;
@@ -216,6 +266,26 @@ export default function SolvePage() {
                           {o.label}
                         </label>
                       ))}
+                      <label className={styles.checkItem}>
+                        <input
+                          type="radio"
+                          name={quiz.id}
+                          checked={choices[i] === CUSTOM_OPTION_ID}
+                          onChange={() => selectOption(i, CUSTOM_OPTION_ID)}
+                          disabled={state !== "active"}
+                        />
+                        직접 쓰기
+                      </label>
+                      {choices[i] === CUSTOM_OPTION_ID && (
+                        <input
+                          type="text"
+                          className={styles.customInput}
+                          placeholder="내 생각을 직접 적어보자"
+                          value={customTexts[i] ?? ""}
+                          onChange={(e) => setCustomText(i, e.target.value)}
+                          disabled={state !== "active"}
+                        />
+                      )}
                     </div>
 
                     {state === "active" && (
@@ -223,7 +293,11 @@ export default function SolvePage() {
                         <button
                           className={styles.checkButton}
                           onClick={() => checkQuiz(i)}
-                          disabled={!choices[i]}
+                          disabled={
+                            !choices[i] ||
+                            (choices[i] === CUSTOM_OPTION_ID &&
+                              (customTexts[i] ?? "").trim() === "")
+                          }
                         >
                           확인
                         </button>
@@ -234,7 +308,11 @@ export default function SolvePage() {
                     )}
 
                     {state === "done" && (
-                      <p className={styles.feedbackCorrect}>{quiz.correctMsg}</p>
+                      <p className={styles.feedbackCorrect}>
+                        {choices[i] === CUSTOM_OPTION_ID
+                          ? "네가 직접 쓴 답으로 진행할게!"
+                          : quiz.correctMsg}
+                      </p>
                     )}
                   </>
                 )}
@@ -244,14 +322,32 @@ export default function SolvePage() {
         })}
       </ol>
 
-      {allDone && (
+      {allDone && composing && (
+        <div className={styles.assembleCard}>
+          <span className={styles.assembleLabel}>
+            {framework.label}{roParticle(framework.label)} 완성한 질문
+          </span>
+          <p className={styles.assemblePraise}>AI가 질문을 다듬고 있어요...</p>
+        </div>
+      )}
+
+      {allDone && !composing && (
         <div className={styles.assembleCard}>
           <span className={styles.assembleLabel}>
             {framework.label}{roParticle(framework.label)} 완성한 질문
           </span>
           <p className={styles.assembleQuestion}>{assembledQuestion}</p>
+          <button
+            type="button"
+            className={styles.speakButton}
+            onClick={speakQuestion}
+          >
+            🔊 들어보기
+          </button>
           <p className={styles.assemblePraise}>
-            네가 찾은 조각들을 모아서 훨씬 더 제대로 된 질문을 완성했어요!
+            {composeFailed
+              ? "네가 찾은 조각들을 모아서 훨씬 더 제대로 된 질문을 완성했어요!"
+              : "AI가 네가 찾은 조각들을 모아 훨씬 더 제대로 된 질문으로 다듬어봤어요!"}
           </p>
 
           {!retypeDone && (
