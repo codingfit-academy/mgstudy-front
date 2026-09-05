@@ -6,11 +6,14 @@ export type CheckQuestionResult = {
 };
 
 /** 백엔드(mgstudy-api)의 POST /ai/check-question 호출: 입력이 진짜 질문인지 AI로 확인 */
-export async function checkQuestion(question: string): Promise<CheckQuestionResult> {
+export async function checkQuestion(
+  question: string,
+  age?: number
+): Promise<CheckQuestionResult> {
   const res = await fetch(`${config.apiUrl}/ai/check-question`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, age }),
   });
   if (!res.ok) throw new Error(`질문 확인 요청 실패: ${res.status}`);
   const data = await res.json();
@@ -22,6 +25,7 @@ export async function composeQuestion(params: {
   originalQuestion: string;
   frameworkLabel: string;
   answers: string[];
+  age?: number;
 }): Promise<string> {
   const res = await fetch(`${config.apiUrl}/ai/compose-question`, {
     method: "POST",
@@ -30,6 +34,7 @@ export async function composeQuestion(params: {
       original_question: params.originalQuestion,
       framework_label: params.frameworkLabel,
       answers: params.answers,
+      age: params.age,
     }),
   });
   if (!res.ok) throw new Error(`질문 종합 요청 실패: ${res.status}`);

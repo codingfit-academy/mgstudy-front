@@ -41,6 +41,10 @@ export default function SolvePage() {
     const stored = sessionStorage.getItem("mgstudy:framework");
     return stored && FRAMEWORKS[stored] ? stored : DEFAULT_FRAMEWORK_ID;
   }, DEFAULT_FRAMEWORK_ID);
+  const age = useClientValue(() => {
+    const raw = Number(sessionStorage.getItem("mgstudy:age"));
+    return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+  }, undefined);
   const [current, setCurrent] = useState(0);
   const framework = FRAMEWORKS[frameworkId] ?? FRAMEWORKS.oheukwonchik;
   const quizzes = framework.quizzes;
@@ -114,6 +118,7 @@ export default function SolvePage() {
       originalQuestion: question,
       frameworkLabel: framework.label,
       answers: assembledValues,
+      age,
     })
       .then((composed) => {
         if (!cancelled) setAiQuestion(composed);

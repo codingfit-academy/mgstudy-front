@@ -16,6 +16,10 @@ export default function AnalyzePage() {
     () => sessionStorage.getItem("mgstudy:question") || DEFAULT_QUESTION,
     DEFAULT_QUESTION
   );
+  const age = useClientValue(() => {
+    const raw = Number(sessionStorage.getItem("mgstudy:age"));
+    return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+  }, undefined);
   const [overrideQuestion, setOverrideQuestion] = useState<string | null>(null);
   const question = overrideQuestion ?? storedQuestion;
 
@@ -32,7 +36,7 @@ export default function AnalyzePage() {
 
   useEffect(() => {
     let cancelled = false;
-    checkQuestion(question)
+    checkQuestion(question, age)
       .then((r) => {
         if (cancelled) return;
         setResult({ question, isQuestion: r.isQuestion, message: r.message });
@@ -44,7 +48,7 @@ export default function AnalyzePage() {
     return () => {
       cancelled = true;
     };
-  }, [question]);
+  }, [question, age]);
 
   function submitRewrite() {
     const next = rewriteText.trim();
