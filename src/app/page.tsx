@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import styles from "./page.module.css";
 import AuthNav from "./components/AuthNav";
 import {
@@ -91,6 +92,10 @@ const MEDIA_LINKS: MediaLink[] = [
 
 export default function Home() {
   const router = useRouter();
+  const cachedAge = useClientValue(
+    () => localStorage.getItem("mgstudy:savedAge") || "",
+    ""
+  );
   const [age, setAge] = useState("");
   const [question, setQuestion] = useState("");
   const reviewItems = useClientValue(getReviewItems, []);
@@ -102,6 +107,7 @@ export default function Home() {
     if (!canSubmit) return;
     sessionStorage.setItem("mgstudy:age", age);
     sessionStorage.setItem("mgstudy:question", question);
+    localStorage.setItem("mgstudy:savedAge", age);
     addHistoryEntry({ question, age, date: new Date().toISOString() });
     router.push("/analyze");
   }
@@ -163,24 +169,7 @@ export default function Home() {
       )}
 
       <form className={styles.card} onSubmit={handleSubmit}>
-        <div className={styles.ageRow}>
-          <label htmlFor="age" className={styles.ageLabel}>
-            나이
-          </label>
-          <input
-            id="age"
-            name="age"
-            type="number"
-            min={1}
-            max={19}
-            inputMode="numeric"
-            placeholder="예: 10"
-            className={styles.ageInput}
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-          />
-          <span className={styles.ageUnit}>살</span>
-        </div>
+        <AgeRow key={cachedAge} initialAge={cachedAge} onAgeChange={setAge} />
 
         <textarea
           name="question"
@@ -218,53 +207,9 @@ export default function Home() {
         직접 풀어낸 답들을 모아 더 제대로 된 질문으로 완성해줘요.
       </p>
 
-      <section className={styles.aboutSection}>
-        <span className={styles.aboutBadge}>MG스터디는 왜 다를까요?</span>
-        <h2 className={styles.aboutTitle}>
-          답을 주는 대신, 더 좋은 질문을 만들도록 도와줘요
-        </h2>
-        <p className={styles.aboutText}>
-          아이가 AI에게 물어보면 답만 쏙 알려주는 경우가 많아요. 그러다
-          보면 스스로 생각하는 힘과 문해력이 자라기 어려워질 수 있어요.
-          MG스터디는 답 대신, 아이가 스스로 질문을 더 또렷하고 완전하게
-          다듬어보도록 도와주는 학습 도우미예요.
-        </p>
-
-        <div className={styles.aboutCards}>
-          <div className={styles.aboutCard}>
-            <span className={styles.aboutIcon} aria-hidden="true">
-              🧭
-            </span>
-            <h3 className={styles.aboutCardTitle}>질문을 다시 잘 만들어요</h3>
-            <p className={styles.aboutCardText}>
-              짧고 서투른 질문을 육하원칙 등 다양한 방식으로 하나씩
-              채워가며, 훨씬 더 또렷하고 제대로 된 질문으로 완성해요.
-            </p>
-          </div>
-
-          <div className={styles.aboutCard}>
-            <span className={styles.aboutIcon} aria-hidden="true">
-              ✍️
-            </span>
-            <h3 className={styles.aboutCardTitle}>원고지에 옮겨 적어요</h3>
-            <p className={styles.aboutCardText}>
-              완성한 질문을 원고지 칸에 한 글자씩 또박또박 옮겨 적으며
-              다시 한 번 마음에 새겨요.
-            </p>
-          </div>
-
-          <div className={styles.aboutCard}>
-            <span className={styles.aboutIcon} aria-hidden="true">
-              🎤
-            </span>
-            <h3 className={styles.aboutCardTitle}>소리 내어 읽어봐요</h3>
-            <p className={styles.aboutCardText}>
-              완성한 질문을 소리 내어 읽으면 AI가 듣고 맞았는지 알려줘요.
-              쓰기와 말하기, 두 가지 방법으로 확인할 수 있어요.
-            </p>
-          </div>
-        </div>
-      </section>
+      <Link href="/about" className={styles.aboutLink}>
+        MG스터디는 왜 다를까요? 자세히 보기 →
+      </Link>
 
       <section className={styles.mediaSection}>
         <p className={styles.mediaLabel}>
@@ -292,6 +237,47 @@ export default function Home() {
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+/** Keyed by the cached age in the parent so this re-mounts (and re-initializes
+ * its own state) once the real localStorage value is known post-hydration. */
+function AgeRow({
+  initialAge,
+  onAgeChange,
+}: {
+  initialAge: string;
+  onAgeChange: (value: string) => void;
+}) {
+  const [age, setAge] = useState(initialAge);
+
+  useEffect(() => {
+    onAgeChange(initialAge);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className={styles.ageRow}>
+      <label htmlFor="age" className={styles.ageLabel}>
+        나이
+      </label>
+      <input
+        id="age"
+        name="age"
+        type="number"
+        min={1}
+        max={19}
+        inputMode="numeric"
+        placeholder="예: 10"
+        className={styles.ageInput}
+        value={age}
+        onChange={(e) => {
+          setAge(e.target.value);
+          onAgeChange(e.target.value);
+        }}
+      />
+      <span className={styles.ageUnit}>살</span>
     </div>
   );
 }

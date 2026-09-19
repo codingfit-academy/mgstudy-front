@@ -41,3 +41,29 @@ export async function composeQuestion(params: {
   const data = await res.json();
   return data.question as string;
 }
+
+export type CheckCompositionResult = {
+  isCorrect: boolean;
+  message: string;
+};
+
+/** 백엔드의 POST /ai/check-composition 호출: 아이가 답 조각들을 직접 이어 쓴
+ * 글(1~2문장)의 지칭 일관성/문법/맞춤법을 확인 */
+export async function checkComposition(params: {
+  pieces: string[];
+  attempt: string;
+  age?: number;
+}): Promise<CheckCompositionResult> {
+  const res = await fetch(`${config.apiUrl}/ai/check-composition`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      pieces: params.pieces,
+      attempt: params.attempt,
+      age: params.age,
+    }),
+  });
+  if (!res.ok) throw new Error(`문장 확인 요청 실패: ${res.status}`);
+  const data = await res.json();
+  return { isCorrect: data.is_correct, message: data.message };
+}

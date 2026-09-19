@@ -35,12 +35,11 @@ export default function AuthNav() {
         </span>
       )}
 
-      <Link href="/mypage" className={styles.link}>
-        마이페이지
-      </Link>
-
       {loggedIn ? (
         <>
+          <Link href="/mypage" className={styles.link}>
+            마이페이지
+          </Link>
           <Link href="/history" className={styles.link}>
             내 질문 기록
           </Link>

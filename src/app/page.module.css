@@ -321,86 +321,23 @@
   color: var(--text-secondary);
 }
 
-.aboutSection {
-  width: 100%;
-  max-width: 780px;
-  margin-top: 16px;
-  padding: 32px 28px;
-  border-radius: 28px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  box-shadow: 0 16px 40px rgba(66, 71, 112, 0.1);
-}
-
-.aboutBadge {
+.aboutLink {
   display: inline-block;
-  margin-bottom: 12px;
-  padding: 4px 12px;
+  margin-top: 4px;
+  padding: 10px 20px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #4285f4, #9168c0);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.aboutTitle {
-  margin-bottom: 12px;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.4;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   color: var(--text-primary);
-}
-
-.aboutText {
-  max-width: 620px;
-  margin: 0 auto 28px;
   font-size: 14px;
-  line-height: 1.7;
-  color: var(--text-secondary);
+  font-weight: 600;
+  transition: transform 0.15s, border-color 0.15s;
 }
 
-.aboutCards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  text-align: left;
-}
-
-.aboutCard {
-  padding: 20px;
-  border-radius: 18px;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-}
-
-.aboutIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-bottom: 10px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #4285f4, #9168c0);
-  font-size: 20px;
-}
-
-.aboutCardTitle {
-  margin-bottom: 6px;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.aboutCardText {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-@media (max-width: 700px) {
-  .aboutCards {
-    grid-template-columns: 1fr;
+@media (hover: hover) and (pointer: fine) {
+  .aboutLink:hover {
+    border-color: #9168c0;
+    transform: translateY(-1px);
   }
 }
 

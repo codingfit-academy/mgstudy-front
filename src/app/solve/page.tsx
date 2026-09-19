@@ -15,7 +15,7 @@ import Fireworks from "../components/Fireworks";
 import SpeechCheck from "../components/SpeechCheck";
 import { playErrorBeep } from "../components/sound";
 import { useClientValue } from "../lib/useClientValue";
-import { composeQuestion } from "../lib/ai";
+import { checkComposition } from "../lib/ai";
 
 const CUSTOM_OPTION_ID = "custom";
 
@@ -106,31 +106,47 @@ export default function SolvePage() {
   });
   const localAssembledQuestion = framework.buildQuestion(assembledValues);
 
-  const [aiQuestion, setAiQuestion] = useState<string | null>(null);
-  const [composeFailed, setComposeFailed] = useState(false);
-  const composing = allDone && aiQuestion === null && !composeFailed;
-  const assembledQuestion = aiQuestion ?? localAssembledQuestion;
+  const [attempt, setAttempt] = useState("");
+  const [checkingComposition, setCheckingComposition] = useState(false);
+  const [compositionResult, setCompositionResult] = useState<{
+    isCorrect: boolean;
+    message: string;
+  } | null>(null);
+  const [compositionAttempts, setCompositionAttempts] = useState(0);
+  const [finalComposition, setFinalComposition] = useState<string | null>(
+    null
+  );
+  const assembledQuestion = finalComposition ?? "";
 
-  useEffect(() => {
-    if (!allDone || aiQuestion !== null || composeFailed) return;
-    let cancelled = false;
-    composeQuestion({
-      originalQuestion: question,
-      frameworkLabel: framework.label,
-      answers: assembledValues,
-      age,
-    })
-      .then((composed) => {
-        if (!cancelled) setAiQuestion(composed);
-      })
-      .catch(() => {
-        if (!cancelled) setComposeFailed(true);
+  async function submitComposition() {
+    const text = attempt.trim();
+    if (!text) return;
+    setCheckingComposition(true);
+    try {
+      const result = await checkComposition({
+        pieces: assembledValues,
+        attempt: text,
+        age,
       });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allDone]);
+      setCompositionResult(result);
+      if (result.isCorrect) {
+        setFinalComposition(text);
+        setCelebrate((n) => n + 1);
+      } else {
+        setCompositionAttempts((n) => n + 1);
+        playErrorBeep();
+      }
+    } catch {
+      // AI 확인을 받을 수 없을 때는 아이가 쓴 글 그대로 진행시켜줌
+      setFinalComposition(text);
+    } finally {
+      setCheckingComposition(false);
+    }
+  }
+
+  function skipComposition() {
+    setFinalComposition(attempt.trim() || localAssembledQuestion);
+  }
 
   function speakQuestion() {
     if (!("speechSynthesis" in window)) return;
@@ -150,10 +166,10 @@ export default function SolvePage() {
   const lastCheckedLengthRef = useRef(0);
 
   useEffect(() => {
-    if (allDone && !composing && !retypeDone) {
+    if (allDone && finalComposition !== null && !retypeDone) {
       manuscriptInputRef.current?.focus();
     }
-  }, [allDone, composing, retypeDone]);
+  }, [allDone, finalComposition, retypeDone]);
 
   useEffect(() => {
     if (!shake) return;
@@ -327,16 +343,58 @@ export default function SolvePage() {
         })}
       </ol>
 
-      {allDone && composing && (
+      {allDone && finalComposition === null && (
         <div className={styles.assembleCard}>
           <span className={styles.assembleLabel}>
-            {framework.label}{roParticle(framework.label)} 완성한 질문
+            {framework.label}{roParticle(framework.label)} 답 조각들
           </span>
-          <p className={styles.assemblePraise}>AI가 질문을 다듬고 있어요...</p>
+          <ul className={styles.pieceList}>
+            {assembledValues.map((v, i) => (
+              <li className={styles.pieceItem} key={i}>
+                {v}
+              </li>
+            ))}
+          </ul>
+          <p className={styles.retypePrompt}>
+            이 조각들을 살려서 궁금한 점을 네 힘으로 이어 써보자. 한
+            문장이어도, 두 문장이어도 괜찮아!
+          </p>
+          <textarea
+            className={styles.compositionInput}
+            rows={3}
+            value={attempt}
+            onChange={(e) => setAttempt(e.target.value)}
+            placeholder="예: 아주 먼 옛날에 공룡이 살았다. 공룡은 왜 멸종했을까?"
+          />
+          <button
+            type="button"
+            className={styles.checkButton}
+            onClick={submitComposition}
+            disabled={attempt.trim() === "" || checkingComposition}
+          >
+            {checkingComposition ? "확인하는 중..." : "확인하기"}
+          </button>
+          {compositionResult && !compositionResult.isCorrect && (
+            <div className={styles.wrongBanner}>
+              <span className={styles.wrongIcon} aria-hidden="true">
+                ⚠
+              </span>
+              <span>{compositionResult.message}</span>
+            </div>
+          )}
+          {compositionAttempts >= 3 && (
+            <button
+              type="button"
+              className={styles.resultButton}
+              onClick={skipComposition}
+            >
+              이대로 진행할래요
+            </button>
+          )}
         </div>
       )}
 
-      {allDone && !composing && (
+      {allDone && finalComposition !== null && (
         <div className={styles.assembleCard}>
           <span className={styles.assembleLabel}>
             {framework.label}{roParticle(framework.label)} 완성한 질문
@@ -350,9 +408,8 @@ export default function SolvePage() {
             🔊 들어보기
           </button>
           <p className={styles.assemblePraise}>
-            {composeFailed
-              ? "네가 찾은 조각들을 모아서 훨씬 더 제대로 된 질문을 완성했어요!"
-              : "AI가 네가 찾은 조각들을 모아 훨씬 더 제대로 된 질문으로 다듬어봤어요!"}
+            네가 찾은 조각들을 스스로 이어서 훨씬 더 제대로 된 질문을
+            완성했어요!
           </p>
 
           {!retypeDone && (

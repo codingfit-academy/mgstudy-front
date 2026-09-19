@@ -1,0 +1,362 @@
+.page {
+  --bg-1: #eaf6ff;
+  --bg-2: #a9ddf7;
+  --text-primary: #1f1f1f;
+  --text-secondary: #5f6368;
+  --card-bg: #ffffff;
+  --card-border: #e6e8f0;
+  --input-bg: #f4f5f9;
+  --input-border: #e2e4ee;
+  --notice-bg: #eef6ee;
+  --notice-text: #2e6b34;
+
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 56px 20px 80px;
+  text-align: center;
+  font-family: var(--font-geist-sans);
+  background: radial-gradient(
+    circle at 50% 0%,
+    var(--bg-2) 0%,
+    var(--bg-1) 55%
+  );
+}
+
+.title {
+  max-width: 560px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.subtitle {
+  max-width: 460px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.backLink {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.aboutSection {
+  width: 100%;
+  max-width: 780px;
+  padding: 32px 28px;
+  border-radius: 28px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 16px 40px rgba(66, 71, 112, 0.1);
+}
+
+.aboutBadge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4285f4, #9168c0);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aboutTitle {
+  margin-bottom: 12px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.aboutText {
+  max-width: 620px;
+  margin: 0 auto 28px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.aboutCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  text-align: left;
+}
+
+.aboutCard {
+  padding: 20px;
+  border-radius: 18px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+}
+
+.aboutIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4285f4, #9168c0);
+  font-size: 20px;
+}
+
+.aboutCardTitle {
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.aboutCardText {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 700px) {
+  .aboutCards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.demoSection {
+  width: 100%;
+  max-width: 780px;
+  padding: 32px 28px;
+  border-radius: 28px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 16px 40px rgba(66, 71, 112, 0.1);
+}
+
+.demoCard {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.demoContent {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.demoBlock {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  text-align: left;
+}
+
+.demoBlockAfter {
+  background: var(--notice-bg);
+  border-color: #34a853;
+  opacity: 0;
+  animation: demoFadeUp 0.5s ease 2.4s both;
+}
+
+.demoBlockLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.demoBlockLabelFixed {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--notice-text);
+}
+
+.demoLine {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.demoIssue {
+  color: #d61f1f;
+  text-decoration: underline wavy #d61f1f;
+  text-decoration-thickness: 2px;
+  animation: demoShake 0.45s ease-in-out 2;
+}
+
+.demoFix {
+  padding: 0 3px;
+  border-radius: 6px;
+  animation: demoHighlightPop 1.4s ease 2.9s both;
+}
+
+.demoAiRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  opacity: 0;
+  animation: demoFadeUp 0.5s ease 1.1s both;
+}
+
+.demoAiIcon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  background: conic-gradient(
+    from 180deg,
+    #4285f4,
+    #9168c0,
+    #ff6b6b,
+    #ffb648,
+    #4285f4
+  );
+  clip-path: polygon(
+    50% 0%,
+    61% 39%,
+    100% 50%,
+    61% 61%,
+    50% 100%,
+    39% 61%,
+    0% 50%,
+    39% 39%
+  );
+  animation: spin 9s linear infinite, pulse 3s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.15);
+  }
+}
+
+.demoBubble {
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 6px 16px rgba(66, 71, 112, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.demoDots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.demoDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--input-border);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.demoDotActive {
+  background: linear-gradient(90deg, #4285f4, #9168c0);
+  transform: scale(1.3);
+}
+
+@keyframes demoShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes demoFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes demoHighlightPop {
+  0% {
+    background: rgba(52, 168, 83, 0);
+  }
+  35% {
+    background: rgba(52, 168, 83, 0.4);
+  }
+  100% {
+    background: rgba(52, 168, 83, 0.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demoIssue,
+  .demoFix,
+  .demoAiRow,
+  .demoBlockAfter,
+  .demoAiIcon {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .title {
+    font-size: 22px;
+  }
+
+  .aboutSection,
+  .demoSection {
+    padding: 24px 18px;
+    border-radius: 22px;
+  }
+
+  .aboutTitle {
+    font-size: 19px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    --bg-1: #0b1220;
+    --bg-2: #142a44;
+    --text-primary: #ededed;
+    --text-secondary: #9aa0ab;
+    --card-bg: #16171f;
+    --card-border: #262838;
+    --input-bg: #1d1f2b;
+    --input-border: #2b2d3d;
+    --notice-bg: #163321;
+    --notice-text: #7fd996;
+  }
+}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import AuthNav from "../components/AuthNav";
 import {
+  isLoggedIn,
   getAccount,
   updateProfile,
   getHistory,
@@ -16,6 +17,7 @@ import { useClientValue } from "../lib/useClientValue";
 
 export default function MyPage() {
   const router = useRouter();
+  const loggedIn = useClientValue(() => isLoggedIn(), false);
   const account = useClientValue(
     () => ({
       nickname: getAccount()?.nickname ?? "",
@@ -25,10 +27,18 @@ export default function MyPage() {
   );
   const history = useClientValue(() => getHistory(), []);
 
+  useEffect(() => {
+    if (!loggedIn) {
+      router.replace("/login");
+    }
+  }, [loggedIn, router]);
+
   function askAgain(question: string) {
     sessionStorage.setItem("mgstudy:question", question);
     router.push("/analyze");
   }
+
+  if (!loggedIn) return null;
 
   return (
     <div className={styles.page}>
