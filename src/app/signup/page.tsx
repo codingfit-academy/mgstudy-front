@@ -4,17 +4,20 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { signup } from "../lib/localAuth";
+import { signup } from "../lib/auth";
+import { useAuth } from "../lib/AuthContext";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { setAccount } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !password.trim()) {
       setError("모든 항목을 입력해주세요.");
@@ -24,9 +27,19 @@ export default function SignupPage() {
       setError("비밀번호가 서로 달라요. 다시 확인해주세요.");
       return;
     }
-    // TODO: 백엔드 회원가입 API 연동 필요. 지금은 계정 정보를 로컬에만 저장합니다.
-    signup({ name: name.trim(), email: email.trim() });
-    router.push("/");
+    setSubmitting(true);
+    try {
+      const account = await signup({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
+      setAccount(account);
+      router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "회원가입에 실패했어요.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -100,8 +113,8 @@ export default function SignupPage() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-        <button type="submit" className={styles.submitButton}>
-          회원가입
+        <button type="submit" className={styles.submitButton} disabled={submitting}>
+          {submitting ? "가입하는 중..." : "회원가입"}
         </button>
       </form>
 

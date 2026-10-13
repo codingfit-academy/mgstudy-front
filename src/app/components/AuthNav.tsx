@@ -3,35 +3,32 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./AuthNav.module.css";
-import {
-  isLoggedIn,
-  getCurrentEmail,
-  getAccount,
-  logout,
-  DEFAULT_AVATAR,
-} from "../lib/localAuth";
-import { useClientValue } from "../lib/useClientValue";
+import { logout } from "../lib/auth";
+import { useAuth } from "../lib/AuthContext";
 
 export default function AuthNav() {
   const router = useRouter();
-  const loggedIn = useClientValue(() => isLoggedIn(), false);
-  const email = useClientValue(() => getCurrentEmail(), null);
-  const nickname = useClientValue(() => getAccount()?.nickname ?? null, null);
-  const avatar = useClientValue(
-    () => getAccount()?.avatar ?? DEFAULT_AVATAR,
-    DEFAULT_AVATAR
-  );
+  const { loading, loggedIn, account, setAccount } = useAuth();
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    // Navigate away first: logout can be triggered from a login-gated page
+    // (mypage/history), and those pages redirect to /login the instant
+    // `loggedIn` flips to false. Starting the navigation to "/" before
+    // clearing the account lets it win that race instead of /login.
     router.push("/");
+    await logout();
+    setAccount(null);
+  }
+
+  if (loading) {
+    return <div className={styles.nav} />;
   }
 
   return (
     <div className={styles.nav}>
-      {loggedIn && (
+      {loggedIn && account && (
         <span className={styles.greeting}>
-          {avatar} {nickname ?? email}님
+          {account.avatar} {account.nickname || account.email}님
         </span>
       )}
 

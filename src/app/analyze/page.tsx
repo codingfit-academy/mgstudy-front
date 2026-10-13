@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import { DEFAULT_QUESTION, FRAMEWORK_LIST } from "../solve/frameworks";
 import { useClientValue } from "../lib/useClientValue";
-import { checkQuestion } from "../lib/ai";
+import { checkQuestion, generateQuiz } from "../lib/ai";
 
 const CHECK_FAILED_TEXT =
   "지금은 AI에게 확인을 받을 수 없어서 그냥 진행할게. 아래 방법 중 하나를 골라서 질문을 더 멋지게 완성해보자!";
+
+const GENERATE_FAILED_TEXT =
+  "지금은 AI가 퀴즈를 만들지 못했어요. 잠시 후 다시 시도해줘.";
 
 export default function AnalyzePage() {
   const router = useRouter();
@@ -34,6 +37,11 @@ export default function AnalyzePage() {
   const isQuestion = result?.isQuestion ?? true;
   const aiMessage = result?.message ?? "";
 
+  const [generatingFrameworkId, setGeneratingFrameworkId] = useState<string | null>(
+    null
+  );
+  const [generateError, setGenerateError] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     checkQuestion(question, age)
@@ -58,9 +66,25 @@ export default function AnalyzePage() {
     setRewriteText("");
   }
 
-  function chooseFramework(id: string) {
-    sessionStorage.setItem("mgstudy:framework", id);
-    router.push("/solve");
+  async function chooseFramework(id: string) {
+    setGenerateError(false);
+    setGeneratingFrameworkId(id);
+    try {
+      const { quizzes, answer } = await generateQuiz({
+        question,
+        framework: id,
+        age,
+      });
+      sessionStorage.setItem(
+        "mgstudy:quizData",
+        JSON.stringify({ quizzes, answer })
+      );
+      sessionStorage.setItem("mgstudy:framework", id);
+      router.push("/solve");
+    } catch {
+      setGenerateError(true);
+      setGeneratingFrameworkId(null);
+    }
   }
 
   return (
@@ -117,13 +141,22 @@ export default function AnalyzePage() {
                 key={f.id}
                 className={styles.frameworkCard}
                 onClick={() => chooseFramework(f.id)}
+                disabled={generatingFrameworkId !== null}
               >
                 <span className={styles.frameworkTitle}>{f.label}</span>
                 <span className={styles.frameworkDesc}>{f.shortDesc}</span>
-                <span className={styles.frameworkArrow}>이 방식으로 시작하기 →</span>
+                <span className={styles.frameworkArrow}>
+                  {generatingFrameworkId === f.id
+                    ? "AI가 퀴즈를 만들고 있어요..."
+                    : "이 방식으로 시작하기 →"}
+                </span>
               </button>
             ))}
           </div>
+
+          {generateError && (
+            <p className={styles.generateErrorText}>{GENERATE_FAILED_TEXT}</p>
+          )}
         </>
       )}
     </div>

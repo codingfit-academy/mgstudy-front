@@ -1,31 +1,29 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import AuthNav from "../components/AuthNav";
-import { isLoggedIn, getCurrentEmail, getHistory } from "../lib/localAuth";
-import { useClientValue } from "../lib/useClientValue";
+import { getHistory, type HistoryEntry } from "../lib/auth";
+import { useRequireAuth } from "../lib/AuthContext";
 
 export default function HistoryPage() {
   const router = useRouter();
-  const loggedIn = useClientValue(() => isLoggedIn(), false);
-  const email = useClientValue(() => getCurrentEmail(), null);
-  const history = useClientValue(() => getHistory(), []);
+  const { loading, loggedIn, account } = useRequireAuth();
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
-    if (!loggedIn) {
-      router.replace("/login");
-    }
-  }, [loggedIn, router]);
+    if (!loggedIn) return;
+    getHistory().then(setHistory);
+  }, [loggedIn]);
 
   function askAgain(question: string) {
     sessionStorage.setItem("mgstudy:question", question);
     router.push("/analyze");
   }
 
-  if (!loggedIn) return null;
+  if (loading || !loggedIn) return null;
 
   return (
     <div className={styles.page}>
@@ -33,7 +31,7 @@ export default function HistoryPage() {
       <div className={styles.headerRow}>
         <div>
           <h1 className={styles.title}>내 질문 기록</h1>
-          <p className={styles.subtitle}>{email}님이 지금까지 물어본 질문이에요.</p>
+          <p className={styles.subtitle}>{account?.email}님이 지금까지 물어본 질문이에요.</p>
         </div>
       </div>
 

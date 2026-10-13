@@ -5,20 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./page.module.css";
 import AuthNav from "./components/AuthNav";
-import {
-  addHistoryEntry,
-  isLoggedIn,
-  getHistory,
-  type HistoryEntry,
-} from "./lib/localAuth";
-import { suggestAdvancedQuestion } from "./lib/advancedQuestions";
+import { addHistoryEntry, getHistory, type HistoryEntry } from "./lib/auth";
+import { useAuth } from "./lib/AuthContext";
+import { suggestAdvancedQuestion } from "./lib/ai";
 import { useClientValue } from "./lib/useClientValue";
 
-function getReviewItems(): HistoryEntry[] {
-  if (!isLoggedIn()) return [];
+function dedupeReviewItems(items: HistoryEntry[]): HistoryEntry[] {
   const seen = new Set<string>();
   const unique: HistoryEntry[] = [];
-  for (const entry of getHistory()) {
+  for (const entry of items) {
     if (seen.has(entry.question)) continue;
     seen.add(entry.question);
     unique.push(entry);
@@ -98,7 +93,20 @@ export default function Home() {
   );
   const [age, setAge] = useState("");
   const [question, setQuestion] = useState("");
-  const reviewItems = useClientValue(getReviewItems, []);
+  const { loggedIn } = useAuth();
+  const [fetchedReviewItems, setFetchedReviewItems] = useState<HistoryEntry[]>([]);
+  const reviewItems = loggedIn ? fetchedReviewItems : [];
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    let cancelled = false;
+    getHistory().then((items) => {
+      if (!cancelled) setFetchedReviewItems(dedupeReviewItems(items));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loggedIn]);
 
   const canSubmit = age.trim() !== "" && question.trim() !== "";
 
@@ -108,7 +116,11 @@ export default function Home() {
     sessionStorage.setItem("mgstudy:age", age);
     sessionStorage.setItem("mgstudy:question", question);
     localStorage.setItem("mgstudy:savedAge", age);
-    addHistoryEntry({ question, age, date: new Date().toISOString() });
+    const ageNum = Number(age);
+    void addHistoryEntry({
+      question,
+      age: Number.isFinite(ageNum) && ageNum > 0 ? ageNum : undefined,
+    });
     router.push("/analyze");
   }
 
@@ -135,35 +147,26 @@ export default function Home() {
             지난번에 물어봤던 질문, 복습해볼까?
           </p>
           <div className={styles.reviewCards}>
-            {reviewItems.map((item, i) => {
-              const advanced = suggestAdvancedQuestion(item.question);
-              return (
-                <div className={styles.reviewCard} key={i}>
-                  <p className={styles.reviewQuestion}>{item.question}</p>
-                  <button
-                    type="button"
-                    className={styles.reviewButton}
-                    onClick={() => startQuestion(item.question, item.age)}
-                  >
-                    복습하기
-                  </button>
+            {reviewItems.map((item, i) => (
+              <div className={styles.reviewCard} key={i}>
+                <p className={styles.reviewQuestion}>{item.question}</p>
+                <button
+                  type="button"
+                  className={styles.reviewButton}
+                  onClick={() =>
+                    startQuestion(item.question, String(item.age ?? ""))
+                  }
+                >
+                  복습하기
+                </button>
 
-                  <div className={styles.advancedBox}>
-                    <span className={styles.advancedLabel}>
-                      🚀 심화 질문
-                    </span>
-                    <p className={styles.advancedText}>{advanced}</p>
-                    <button
-                      type="button"
-                      className={styles.advancedButton}
-                      onClick={() => startQuestion(advanced, item.age)}
-                    >
-                      이것도 풀어보기
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                <AdvancedQuestionBox
+                  question={item.question}
+                  age={item.age ?? undefined}
+                  onPick={(q) => startQuestion(q, String(item.age ?? ""))}
+                />
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -237,6 +240,57 @@ export default function Home() {
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+/** Fetches its own AI-suggested follow-up question on mount instead of
+ * blocking the whole review list on one slow/failed call. */
+function AdvancedQuestionBox({
+  question,
+  age,
+  onPick,
+}: {
+  question: string;
+  age?: number;
+  onPick: (question: string) => void;
+}) {
+  const [advanced, setAdvanced] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    suggestAdvancedQuestion(question, age)
+      .then((q) => {
+        if (!cancelled) setAdvanced(q);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [question, age]);
+
+  if (failed) return null;
+
+  return (
+    <div className={styles.advancedBox}>
+      <span className={styles.advancedLabel}>🚀 심화 질문</span>
+      {advanced === null ? (
+        <p className={styles.advancedText}>생각하는 중...</p>
+      ) : (
+        <>
+          <p className={styles.advancedText}>{advanced}</p>
+          <button
+            type="button"
+            className={styles.advancedButton}
+            onClick={() => onPick(advanced)}
+          >
+            이것도 풀어보기
+          </button>
+        </>
+      )}
     </div>
   );
 }

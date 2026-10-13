@@ -4,23 +4,32 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { login } from "../lib/localAuth";
+import { login } from "../lib/auth";
+import { useAuth } from "../lib/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { setAccount } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("이메일과 비밀번호를 입력해주세요.");
       return;
     }
-    // TODO: 백엔드 로그인 API 연동 필요. 지금은 로그인 상태만 로컬에 표시합니다.
-    login(email.trim());
-    router.push("/history");
+    setSubmitting(true);
+    try {
+      const account = await login(email.trim(), password);
+      setAccount(account);
+      router.push("/history");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "로그인에 실패했어요.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -64,8 +73,8 @@ export default function LoginPage() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-        <button type="submit" className={styles.submitButton}>
-          로그인
+        <button type="submit" className={styles.submitButton} disabled={submitting}>
+          {submitting ? "로그인 중..." : "로그인"}
         </button>
       </form>
 

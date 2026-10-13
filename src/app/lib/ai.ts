@@ -42,6 +42,74 @@ export async function composeQuestion(params: {
   return data.question as string;
 }
 
+/** 백엔드의 POST /ai/suggest-advanced-question 호출: 원래 질문보다 한 단계
+ * 더 깊은 심화 질문을 추천 */
+export async function suggestAdvancedQuestion(
+  question: string,
+  age?: number
+): Promise<string> {
+  const res = await fetch(`${config.apiUrl}/ai/suggest-advanced-question`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, age }),
+  });
+  if (!res.ok) throw new Error(`심화 질문 요청 실패: ${res.status}`);
+  const data = await res.json();
+  return data.question as string;
+}
+
+export type QuizOption = { id: string; label: string; value: string };
+
+export type Quiz = {
+  id: string;
+  title: string;
+  desc: string;
+  options: QuizOption[];
+  correctId: string;
+  wrongMsg: string;
+  correctMsg: string;
+};
+
+type RawQuizStep = {
+  id: string;
+  title: string;
+  desc: string;
+  options: QuizOption[];
+  correct_id: string;
+  wrong_msg: string;
+  correct_msg: string;
+};
+
+/** 백엔드의 POST /ai/generate-quiz 호출: 아이의 실제 질문 주제에 맞는 3단계
+ * 퀴즈(육하원칙/원인과 결과)와 최종 설명을 생성 */
+export async function generateQuiz(params: {
+  question: string;
+  framework: string;
+  age?: number;
+}): Promise<{ quizzes: Quiz[]; answer: string }> {
+  const res = await fetch(`${config.apiUrl}/ai/generate-quiz`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question: params.question,
+      framework: params.framework,
+      age: params.age,
+    }),
+  });
+  if (!res.ok) throw new Error(`퀴즈 생성 요청 실패: ${res.status}`);
+  const data: { quizzes: RawQuizStep[]; answer: string } = await res.json();
+  const quizzes: Quiz[] = data.quizzes.map((q) => ({
+    id: q.id,
+    title: q.title,
+    desc: q.desc,
+    options: q.options,
+    correctId: q.correct_id,
+    wrongMsg: q.wrong_msg,
+    correctMsg: q.correct_msg,
+  }));
+  return { quizzes, answer: data.answer };
+}
+
 export type CheckCompositionResult = {
   isCorrect: boolean;
   message: string;

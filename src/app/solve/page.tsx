@@ -9,19 +9,30 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { DEFAULT_QUESTION, FRAMEWORKS } from "./frameworks";
+import { DEFAULT_QUESTION, DEFAULT_FRAMEWORK_ID, FRAMEWORK_LABELS } from "./frameworks";
 import { roParticle } from "./korean";
 import Fireworks from "../components/Fireworks";
 import SpeechCheck from "../components/SpeechCheck";
 import { playErrorBeep } from "../components/sound";
 import { useClientValue } from "../lib/useClientValue";
-import { checkComposition } from "../lib/ai";
+import { checkComposition, type Quiz } from "../lib/ai";
 
 const CUSTOM_OPTION_ID = "custom";
 
-const DEFAULT_FRAMEWORK_ID = "oheukwonchik";
-
 const MANUSCRIPT_COLUMNS = 10;
+
+type QuizData = { quizzes: Quiz[]; answer: string };
+
+function readQuizData(): QuizData | null {
+  const raw = sessionStorage.getItem("mgstudy:quizData");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as QuizData;
+    return Array.isArray(parsed.quizzes) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 type StepState = "locked" | "active" | "done";
 
@@ -39,15 +50,23 @@ export default function SolvePage() {
   );
   const frameworkId = useClientValue(() => {
     const stored = sessionStorage.getItem("mgstudy:framework");
-    return stored && FRAMEWORKS[stored] ? stored : DEFAULT_FRAMEWORK_ID;
+    return stored && FRAMEWORK_LABELS[stored] ? stored : DEFAULT_FRAMEWORK_ID;
   }, DEFAULT_FRAMEWORK_ID);
   const age = useClientValue(() => {
     const raw = Number(sessionStorage.getItem("mgstudy:age"));
     return Number.isFinite(raw) && raw > 0 ? raw : undefined;
   }, undefined);
+  const quizData = useClientValue<QuizData | null>(readQuizData, null);
   const [current, setCurrent] = useState(0);
-  const framework = FRAMEWORKS[frameworkId] ?? FRAMEWORKS.oheukwonchik;
-  const quizzes = framework.quizzes;
+  const frameworkLabel = FRAMEWORK_LABELS[frameworkId] ?? FRAMEWORK_LABELS[DEFAULT_FRAMEWORK_ID];
+  const quizzes = quizData?.quizzes ?? [];
+
+  useEffect(() => {
+    if (quizData === null) {
+      router.replace("/analyze");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizData]);
 
   // Sized lazily as answers come in rather than pre-sized to `quizzes.length`,
   // since `frameworkId` above can swap from the SSR fallback to the real
@@ -97,14 +116,13 @@ export default function SolvePage() {
     }
   }
 
-  const allDone = current >= quizzes.length;
+  const allDone = quizData !== null && quizzes.length > 0 && current >= quizzes.length;
   const assembledValues = quizzes.map((quiz, i) => {
     const chosenId = choices[i];
     if (chosenId === CUSTOM_OPTION_ID) return (customTexts[i] ?? "").trim();
     const option = quiz.options.find((o) => o.id === chosenId);
     return option ? option.value : "";
   });
-  const localAssembledQuestion = framework.buildQuestion(assembledValues);
 
   const [attempt, setAttempt] = useState("");
   const [checkingComposition, setCheckingComposition] = useState(false);
@@ -145,7 +163,9 @@ export default function SolvePage() {
   }
 
   function skipComposition() {
-    setFinalComposition(attempt.trim() || localAssembledQuestion);
+    const text = attempt.trim();
+    if (!text) return;
+    setFinalComposition(text);
   }
 
   function speakQuestion() {
@@ -346,7 +366,7 @@ export default function SolvePage() {
       {allDone && finalComposition === null && (
         <div className={styles.assembleCard}>
           <span className={styles.assembleLabel}>
-            {framework.label}{roParticle(framework.label)} 답 조각들
+            {frameworkLabel}{roParticle(frameworkLabel)} 답 조각들
           </span>
           <ul className={styles.pieceList}>
             {assembledValues.map((v, i) => (
@@ -387,6 +407,7 @@ export default function SolvePage() {
               type="button"
               className={styles.resultButton}
               onClick={skipComposition}
+              disabled={attempt.trim() === ""}
             >
               이대로 진행할래요
             </button>
@@ -397,7 +418,7 @@ export default function SolvePage() {
       {allDone && finalComposition !== null && (
         <div className={styles.assembleCard}>
           <span className={styles.assembleLabel}>
-            {framework.label}{roParticle(framework.label)} 완성한 질문
+            {frameworkLabel}{roParticle(frameworkLabel)} 완성한 질문
           </span>
           <p className={styles.assembleQuestion}>{assembledQuestion}</p>
           <button

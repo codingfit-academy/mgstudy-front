@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import styles from "./page.module.css";
-import { FRAMEWORKS } from "../solve/frameworks";
 import Fireworks from "../components/Fireworks";
 import { useClientValue } from "../lib/useClientValue";
 
@@ -12,9 +11,14 @@ export default function ResultPage() {
     ""
   );
   const answer = useClientValue(() => {
-    const storedFramework = sessionStorage.getItem("mgstudy:framework");
-    const framework = storedFramework ? FRAMEWORKS[storedFramework] : undefined;
-    return framework?.answer ?? "";
+    const raw = sessionStorage.getItem("mgstudy:quizData");
+    if (!raw) return "";
+    try {
+      const parsed = JSON.parse(raw) as { answer?: string };
+      return parsed.answer ?? "";
+    } catch {
+      return "";
+    }
   }, "");
 
   return (
