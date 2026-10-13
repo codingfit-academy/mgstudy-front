@@ -8,7 +8,6 @@ import AuthNav from "./components/AuthNav";
 import { addHistoryEntry, getHistory, type HistoryEntry } from "./lib/auth";
 import { useAuth } from "./lib/AuthContext";
 import { suggestAdvancedQuestion } from "./lib/ai";
-import { useClientValue } from "./lib/useClientValue";
 
 function dedupeReviewItems(items: HistoryEntry[]): HistoryEntry[] {
   const seen = new Set<string>();
@@ -87,13 +86,8 @@ const MEDIA_LINKS: MediaLink[] = [
 
 export default function Home() {
   const router = useRouter();
-  const cachedAge = useClientValue(
-    () => localStorage.getItem("mgstudy:savedAge") || "",
-    ""
-  );
-  const [age, setAge] = useState("");
   const [question, setQuestion] = useState("");
-  const { loggedIn } = useAuth();
+  const { loggedIn, account } = useAuth();
   const [fetchedReviewItems, setFetchedReviewItems] = useState<HistoryEntry[]>([]);
   const reviewItems = loggedIn ? fetchedReviewItems : [];
 
@@ -108,19 +102,17 @@ export default function Home() {
     };
   }, [loggedIn]);
 
-  const canSubmit = age.trim() !== "" && question.trim() !== "";
+  const canSubmit = question.trim() !== "";
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canSubmit) return;
-    sessionStorage.setItem("mgstudy:age", age);
+    // Age comes from the account (set once at signup / in mypage); guests and
+    // accounts without one get the AI's default elementary-school level.
+    const age = account?.age ?? undefined;
+    sessionStorage.setItem("mgstudy:age", age === undefined ? "" : String(age));
     sessionStorage.setItem("mgstudy:question", question);
-    localStorage.setItem("mgstudy:savedAge", age);
-    const ageNum = Number(age);
-    void addHistoryEntry({
-      question,
-      age: Number.isFinite(ageNum) && ageNum > 0 ? ageNum : undefined,
-    });
+    void addHistoryEntry({ question, age });
     router.push("/analyze");
   }
 
@@ -172,8 +164,6 @@ export default function Home() {
       )}
 
       <form className={styles.card} onSubmit={handleSubmit}>
-        <AgeRow key={cachedAge} initialAge={cachedAge} onAgeChange={setAge} />
-
         <textarea
           name="question"
           className={styles.questionInput}
@@ -206,8 +196,8 @@ export default function Home() {
       </div>
 
       <p className={styles.footnote}>
-        AI가 네 질문을 육하원칙에 맞게 나눠 퀴즈로 만들고, 네가 하나씩
-        직접 풀어낸 답들을 모아 더 제대로 된 질문으로 완성해줘요.
+        AI가 네 질문에서 막연한 부분을 찾아 퀴즈로 만들고, 네가 하나씩
+        직접 풀어낸 답들로 더 구체적인 질문을 완성해요.
       </p>
 
       <Link href="/about" className={styles.aboutLink}>
@@ -240,8 +230,49 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <footer className={styles.footer}>
+        <Link href="/privacy" className={styles.footerLink}>
+          개인정보 처리 안내
+        </Link>
+      </footer>
     </div>
   );
+}
+
+// Review cards re-render on every home visit; without this each visit would
+// pay for a fresh AI suggestion for the same past question.
+const ADVANCED_CACHE_KEY = "mgstudy:advancedCache";
+const ADVANCED_CACHE_LIMIT = 30;
+
+function advancedCacheKey(question: string, age?: number) {
+  return `${age ?? ""}|${question}`;
+}
+
+function readAdvancedCache(question: string, age?: number): string | null {
+  try {
+    const raw = localStorage.getItem(ADVANCED_CACHE_KEY);
+    if (!raw) return null;
+    const cache: Record<string, string> = JSON.parse(raw);
+    return cache[advancedCacheKey(question, age)] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeAdvancedCache(question: string, age: number | undefined, value: string) {
+  try {
+    const raw = localStorage.getItem(ADVANCED_CACHE_KEY);
+    const cache: Record<string, string> = raw ? JSON.parse(raw) : {};
+    cache[advancedCacheKey(question, age)] = value;
+    const keys = Object.keys(cache);
+    for (const k of keys.slice(0, Math.max(0, keys.length - ADVANCED_CACHE_LIMIT))) {
+      delete cache[k];
+    }
+    localStorage.setItem(ADVANCED_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // storage full/unavailable: just skip caching
+  }
 }
 
 /** Fetches its own AI-suggested follow-up question on mount instead of
@@ -260,7 +291,14 @@ function AdvancedQuestionBox({
 
   useEffect(() => {
     let cancelled = false;
-    suggestAdvancedQuestion(question, age)
+    const cached = readAdvancedCache(question, age);
+    const request = cached
+      ? Promise.resolve(cached)
+      : suggestAdvancedQuestion(question, age).then((q) => {
+          writeAdvancedCache(question, age, q);
+          return q;
+        });
+    request
       .then((q) => {
         if (!cancelled) setAdvanced(q);
       })
@@ -291,47 +329,6 @@ function AdvancedQuestionBox({
           </button>
         </>
       )}
-    </div>
-  );
-}
-
-/** Keyed by the cached age in the parent so this re-mounts (and re-initializes
- * its own state) once the real localStorage value is known post-hydration. */
-function AgeRow({
-  initialAge,
-  onAgeChange,
-}: {
-  initialAge: string;
-  onAgeChange: (value: string) => void;
-}) {
-  const [age, setAge] = useState(initialAge);
-
-  useEffect(() => {
-    onAgeChange(initialAge);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <div className={styles.ageRow}>
-      <label htmlFor="age" className={styles.ageLabel}>
-        나이
-      </label>
-      <input
-        id="age"
-        name="age"
-        type="number"
-        min={1}
-        max={19}
-        inputMode="numeric"
-        placeholder="예: 10"
-        className={styles.ageInput}
-        value={age}
-        onChange={(e) => {
-          setAge(e.target.value);
-          onAgeChange(e.target.value);
-        }}
-      />
-      <span className={styles.ageUnit}>살</span>
     </div>
   );
 }

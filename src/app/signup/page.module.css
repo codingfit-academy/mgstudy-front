@@ -94,6 +94,33 @@
   background: var(--card-bg);
 }
 
+.hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.consentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.consentRow input {
+  margin-top: 3px;
+}
+
+.consentLink {
+  font-weight: 700;
+  color: #4285f4;
+  text-decoration: underline;
+}
+
 .error {
   margin-top: 6px;
   font-size: 13px;

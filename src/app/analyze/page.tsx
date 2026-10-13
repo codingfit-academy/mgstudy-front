@@ -3,21 +3,61 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { DEFAULT_QUESTION, FRAMEWORK_LIST } from "../solve/frameworks";
 import { useClientValue } from "../lib/useClientValue";
-import { checkQuestion, generateQuiz } from "../lib/ai";
+import { analyzeQuestion, type AnalyzeQuestionResult, type Quiz } from "../lib/ai";
 
-const CHECK_FAILED_TEXT =
-  "지금은 AI에게 확인을 받을 수 없어서 그냥 진행할게. 아래 방법 중 하나를 골라서 질문을 더 멋지게 완성해보자!";
+// Reuse the last successful analysis for the same question+age within this tab,
+// so refreshing /analyze or coming back from /solve doesn't pay for a new AI call.
+const ANALYSIS_CACHE_KEY = "mgstudy:analysis";
 
-const GENERATE_FAILED_TEXT =
-  "지금은 AI가 퀴즈를 만들지 못했어요. 잠시 후 다시 시도해줘.";
+function readCachedAnalysis(
+  question: string,
+  age: number | undefined
+): AnalyzeQuestionResult | null {
+  try {
+    const raw = sessionStorage.getItem(ANALYSIS_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (cached.question !== question || cached.age !== (age ?? null)) return null;
+    return cached.result as AnalyzeQuestionResult;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAnalysis(
+  question: string,
+  age: number | undefined,
+  result: AnalyzeQuestionResult
+) {
+  sessionStorage.setItem(
+    ANALYSIS_CACHE_KEY,
+    JSON.stringify({ question, age: age ?? null, result })
+  );
+}
+
+const ANALYZE_FAILED_TEXT =
+  "지금은 AI에게 질문을 보낼 수 없어요. 잠시 후 다시 시도해줘.";
+
+type AnalyzeState =
+  | {
+      key: string;
+      status: "done";
+      isQuestion: boolean;
+      message: string;
+      quizzes: Quiz[];
+      answer: string;
+    }
+  | { key: string; status: "failed" };
 
 export default function AnalyzePage() {
   const router = useRouter();
-  const storedQuestion = useClientValue(
-    () => sessionStorage.getItem("mgstudy:question") || DEFAULT_QUESTION,
-    DEFAULT_QUESTION
+  // null = not read yet (SSR/hydration render), "" = genuinely no question.
+  // Effects from the hydration render still see the fallback, so the redirect
+  // below must not treat "not read yet" as "missing".
+  const storedQuestion = useClientValue<string | null>(
+    () => sessionStorage.getItem("mgstudy:question") ?? "",
+    null
   );
   const age = useClientValue(() => {
     const raw = Number(sessionStorage.getItem("mgstudy:age"));
@@ -26,37 +66,46 @@ export default function AnalyzePage() {
   const [overrideQuestion, setOverrideQuestion] = useState<string | null>(null);
   const question = overrideQuestion ?? storedQuestion;
 
-  const [result, setResult] = useState<{
-    question: string;
-    isQuestion: boolean;
-    message: string;
-  } | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const requestKey = `${question}#${retryCount}`;
+  const [result, setResult] = useState<AnalyzeState | null>(null);
   const [rewriteText, setRewriteText] = useState("");
 
-  const checking = result === null || result.question !== question;
-  const isQuestion = result?.isQuestion ?? true;
-  const aiMessage = result?.message ?? "";
-
-  const [generatingFrameworkId, setGeneratingFrameworkId] = useState<string | null>(
-    null
-  );
-  const [generateError, setGenerateError] = useState(false);
+  const analyzing = result === null || result.key !== requestKey;
 
   useEffect(() => {
+    if (question === null) return;
+    if (question === "") {
+      router.replace("/");
+      return;
+    }
     let cancelled = false;
-    checkQuestion(question, age)
+    const key = `${question}#${retryCount}`;
+    const cached = readCachedAnalysis(question, age);
+    const request = cached
+      ? Promise.resolve(cached)
+      : analyzeQuestion(question, age).then((r) => {
+          if (!r.isQuestion || r.quizzes.length > 0) {
+            writeCachedAnalysis(question, age, r);
+          }
+          return r;
+        });
+    request
       .then((r) => {
         if (cancelled) return;
-        setResult({ question, isQuestion: r.isQuestion, message: r.message });
+        if (r.isQuestion && r.quizzes.length === 0) {
+          setResult({ key, status: "failed" });
+          return;
+        }
+        setResult({ key, status: "done", ...r });
       })
       .catch(() => {
-        if (cancelled) return;
-        setResult({ question, isQuestion: true, message: CHECK_FAILED_TEXT });
+        if (!cancelled) setResult({ key, status: "failed" });
       });
     return () => {
       cancelled = true;
     };
-  }, [question, age]);
+  }, [question, age, retryCount, router]);
 
   function submitRewrite() {
     const next = rewriteText.trim();
@@ -66,26 +115,12 @@ export default function AnalyzePage() {
     setRewriteText("");
   }
 
-  async function chooseFramework(id: string) {
-    setGenerateError(false);
-    setGeneratingFrameworkId(id);
-    try {
-      const { quizzes, answer } = await generateQuiz({
-        question,
-        framework: id,
-        age,
-      });
-      sessionStorage.setItem(
-        "mgstudy:quizData",
-        JSON.stringify({ quizzes, answer })
-      );
-      sessionStorage.setItem("mgstudy:framework", id);
-      router.push("/solve");
-    } catch {
-      setGenerateError(true);
-      setGeneratingFrameworkId(null);
-    }
+  function startQuiz(quizzes: Quiz[], answer: string) {
+    sessionStorage.setItem("mgstudy:quizData", JSON.stringify({ quizzes, answer }));
+    router.push("/solve");
   }
+
+  if (!question) return null;
 
   return (
     <div className={styles.page}>
@@ -96,17 +131,32 @@ export default function AnalyzePage() {
         <p className={styles.questionText}>{question}</p>
       </div>
 
-      {checking && (
+      {analyzing && (
         <div className={styles.analysisCard}>
           <span className={styles.analysisLabel}>AI의 분석</span>
-          <p className={styles.analysisText}>질문을 살펴보고 있어요...</p>
+          <p className={styles.analysisText}>
+            질문을 살펴보고, 더 구체적으로 만들 부분을 찾고 있어요...
+          </p>
         </div>
       )}
 
-      {!checking && !isQuestion && (
+      {!analyzing && result?.status === "failed" && (
         <div className={styles.warnCard}>
           <span className={styles.warnLabel}>AI의 분석</span>
-          <p className={styles.warnText}>{aiMessage}</p>
+          <p className={styles.warnText}>{ANALYZE_FAILED_TEXT}</p>
+          <button
+            className={styles.rewriteButton}
+            onClick={() => setRetryCount((n) => n + 1)}
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+
+      {!analyzing && result?.status === "done" && !result.isQuestion && (
+        <div className={styles.warnCard}>
+          <span className={styles.warnLabel}>AI의 분석</span>
+          <p className={styles.warnText}>{result.message}</p>
 
           <p className={styles.rewritePrompt}>질문을 다시 적어볼까?</p>
           <textarea
@@ -126,37 +176,31 @@ export default function AnalyzePage() {
         </div>
       )}
 
-      {!checking && isQuestion && (
+      {!analyzing && result?.status === "done" && result.isQuestion && (
         <>
           <div className={styles.analysisCard}>
             <span className={styles.analysisLabel}>AI의 분석</span>
-            <p className={styles.analysisText}>{aiMessage}</p>
+            <p className={styles.analysisText}>{result.message}</p>
           </div>
 
-          <p className={styles.pickLabel}>어떤 방식으로 질문을 완성해볼까?</p>
-
-          <div className={styles.frameworkGrid}>
-            {FRAMEWORK_LIST.map((f) => (
-              <button
-                key={f.id}
-                className={styles.frameworkCard}
-                onClick={() => chooseFramework(f.id)}
-                disabled={generatingFrameworkId !== null}
-              >
-                <span className={styles.frameworkTitle}>{f.label}</span>
-                <span className={styles.frameworkDesc}>{f.shortDesc}</span>
-                <span className={styles.frameworkArrow}>
-                  {generatingFrameworkId === f.id
-                    ? "AI가 퀴즈를 만들고 있어요..."
-                    : "이 방식으로 시작하기 →"}
-                </span>
-              </button>
-            ))}
+          <div className={styles.focusCard}>
+            <p className={styles.pickLabel}>
+              이 질문을 더 구체적으로 만들려면, 이 세 가지를 채워보자!
+            </p>
+            <ol className={styles.focusList}>
+              {result.quizzes.map((q) => (
+                <li key={q.id} className={styles.focusItem}>
+                  {q.title}
+                </li>
+              ))}
+            </ol>
+            <button
+              className={styles.startButton}
+              onClick={() => startQuiz(result.quizzes, result.answer)}
+            >
+              퀴즈 시작하기 →
+            </button>
           </div>
-
-          {generateError && (
-            <p className={styles.generateErrorText}>{GENERATE_FAILED_TEXT}</p>
-          )}
         </>
       )}
     </div>

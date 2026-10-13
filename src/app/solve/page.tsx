@@ -9,8 +9,6 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import { DEFAULT_QUESTION, DEFAULT_FRAMEWORK_ID, FRAMEWORK_LABELS } from "./frameworks";
-import { roParticle } from "./korean";
 import Fireworks from "../components/Fireworks";
 import SpeechCheck from "../components/SpeechCheck";
 import { playErrorBeep } from "../components/sound";
@@ -45,20 +43,21 @@ function stateOf(stepIndex: number, current: number): StepState {
 export default function SolvePage() {
   const router = useRouter();
   const question = useClientValue(
-    () => sessionStorage.getItem("mgstudy:question") || DEFAULT_QUESTION,
-    DEFAULT_QUESTION
+    () => sessionStorage.getItem("mgstudy:question") || "",
+    ""
   );
-  const frameworkId = useClientValue(() => {
-    const stored = sessionStorage.getItem("mgstudy:framework");
-    return stored && FRAMEWORK_LABELS[stored] ? stored : DEFAULT_FRAMEWORK_ID;
-  }, DEFAULT_FRAMEWORK_ID);
   const age = useClientValue(() => {
     const raw = Number(sessionStorage.getItem("mgstudy:age"));
     return Number.isFinite(raw) && raw > 0 ? raw : undefined;
   }, undefined);
-  const quizData = useClientValue<QuizData | null>(readQuizData, null);
+  // undefined = not read yet (SSR/hydration render), null = genuinely missing.
+  // Effects from the hydration render still see the fallback, so only a real
+  // null may trigger the redirect (otherwise a refresh of /solve bounces away).
+  const quizData = useClientValue<QuizData | null | undefined>(
+    readQuizData,
+    undefined
+  );
   const [current, setCurrent] = useState(0);
-  const frameworkLabel = FRAMEWORK_LABELS[frameworkId] ?? FRAMEWORK_LABELS[DEFAULT_FRAMEWORK_ID];
   const quizzes = quizData?.quizzes ?? [];
 
   useEffect(() => {
@@ -69,8 +68,8 @@ export default function SolvePage() {
   }, [quizData]);
 
   // Sized lazily as answers come in rather than pre-sized to `quizzes.length`,
-  // since `frameworkId` above can swap from the SSR fallback to the real
-  // stored value right after hydration — every read of these arrays already
+  // since `quizData` above swaps from the SSR fallback to the real stored
+  // value right after hydration — every read of these arrays already
   // tolerates missing/undefined entries, so no fixed size is needed.
   const [choices, setChoices] = useState<(string | null)[]>([]);
   const [customTexts, setCustomTexts] = useState<string[]>([]);
@@ -116,7 +115,7 @@ export default function SolvePage() {
     }
   }
 
-  const allDone = quizData !== null && quizzes.length > 0 && current >= quizzes.length;
+  const allDone = quizzes.length > 0 && current >= quizzes.length;
   const assembledValues = quizzes.map((quiz, i) => {
     const chosenId = choices[i];
     if (chosenId === CUSTOM_OPTION_ID) return (customTexts[i] ?? "").trim();
@@ -131,6 +130,7 @@ export default function SolvePage() {
     message: string;
   } | null>(null);
   const [compositionAttempts, setCompositionAttempts] = useState(0);
+  const [lastCheckedAttempt, setLastCheckedAttempt] = useState<string | null>(null);
   const [finalComposition, setFinalComposition] = useState<string | null>(
     null
   );
@@ -139,6 +139,13 @@ export default function SolvePage() {
   async function submitComposition() {
     const text = attempt.trim();
     if (!text) return;
+    // Resubmitting the exact text that was just marked wrong would only pay
+    // for the same feedback again — keep showing it instead.
+    if (text === lastCheckedAttempt && compositionResult && !compositionResult.isCorrect) {
+      playErrorBeep();
+      return;
+    }
+    setLastCheckedAttempt(text);
     setCheckingComposition(true);
     try {
       const result = await checkComposition({
@@ -179,6 +186,9 @@ export default function SolvePage() {
   const [retypedText, setRetypedText] = useState("");
   const [retypeWrong, setRetypeWrong] = useState(false);
   const [retypeDone, setRetypeDone] = useState(false);
+  const [doneMessage, setDoneMessage] = useState(
+    "오타 없이 정확하게 옮겨 적었어요!"
+  );
   const [shake, setShake] = useState(false);
   const [caretPos, setCaretPos] = useState(0);
   const manuscriptInputRef = useRef<HTMLInputElement>(null);
@@ -256,7 +266,6 @@ export default function SolvePage() {
 
   function goToResult() {
     sessionStorage.setItem("mgstudy:finalQuestion", assembledQuestion);
-    sessionStorage.setItem("mgstudy:framework", frameworkId);
     router.push("/result");
   }
 
@@ -366,7 +375,7 @@ export default function SolvePage() {
       {allDone && finalComposition === null && (
         <div className={styles.assembleCard}>
           <span className={styles.assembleLabel}>
-            {frameworkLabel}{roParticle(frameworkLabel)} 답 조각들
+            내가 찾은 답 조각들
           </span>
           <ul className={styles.pieceList}>
             {assembledValues.map((v, i) => (
@@ -384,7 +393,7 @@ export default function SolvePage() {
             rows={3}
             value={attempt}
             onChange={(e) => setAttempt(e.target.value)}
-            placeholder="예: 아주 먼 옛날에 공룡이 살았다. 공룡은 왜 멸종했을까?"
+            placeholder="위의 조각들을 넣어서 한두 문장으로 써보자"
           />
           <button
             type="button"
@@ -418,7 +427,7 @@ export default function SolvePage() {
       {allDone && finalComposition !== null && (
         <div className={styles.assembleCard}>
           <span className={styles.assembleLabel}>
-            {frameworkLabel}{roParticle(frameworkLabel)} 완성한 질문
+            구체적으로 완성한 질문
           </span>
           <p className={styles.assembleQuestion}>{assembledQuestion}</p>
           <button
@@ -501,7 +510,8 @@ export default function SolvePage() {
 
               <SpeechCheck
                 target={assembledQuestion}
-                onCorrect={() => {
+                onCorrect={(message) => {
+                  setDoneMessage(message);
                   setRetypeDone(true);
                   setCelebrate((n) => n + 1);
                 }}
@@ -511,9 +521,7 @@ export default function SolvePage() {
 
           {retypeDone && (
             <div className={styles.retypeSection}>
-              <p className={styles.feedbackCorrect}>
-                오타 없이 정확하게 옮겨 적었어요!
-              </p>
+              <p className={styles.feedbackCorrect}>{doneMessage}</p>
               <button className={styles.resultButton} onClick={goToResult}>
                 결과보기
               </button>

@@ -40,6 +40,7 @@ export default function MyPage() {
       <ProfileForm
         initialNickname={account.nickname}
         initialAvatar={account.avatar}
+        initialAge={account.age}
         onSaved={setAccount}
       />
 
@@ -59,7 +60,7 @@ export default function MyPage() {
                 <div className={styles.historyInfo}>
                   <p className={styles.historyQuestion}>{item.question}</p>
                   <p className={styles.historyMeta}>
-                    {item.age}살 ·{" "}
+                    {item.age !== null && `${item.age}살 · `}
                     {new Date(item.date).toLocaleString("ko-KR")}
                   </p>
                 </div>
@@ -85,23 +86,33 @@ export default function MyPage() {
 function ProfileForm({
   initialNickname,
   initialAvatar,
+  initialAge,
   onSaved,
 }: {
   initialNickname: string;
   initialAvatar: string;
+  initialAge: number | null;
   onSaved: (account: Account) => void;
 }) {
   const [nickname, setNickname] = useState(initialNickname);
   const [avatar, setAvatar] = useState(initialAvatar);
+  const [age, setAge] = useState(initialAge === null ? "" : String(initialAge));
+  const [ageError, setAgeError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState(false);
 
   async function handleSave() {
+    const ageNum = age.trim() === "" ? undefined : Number(age);
+    if (ageNum !== undefined && !(Number.isInteger(ageNum) && ageNum >= 1 && ageNum <= 19)) {
+      setAgeError(true);
+      return;
+    }
     setSaving(true);
     try {
       const updated = await updateProfile({
         nickname: nickname.trim() || "이름 없음",
         avatar,
+        age: ageNum,
       });
       onSaved(updated);
       setSavedMessage(true);
@@ -125,6 +136,29 @@ function ProfileForm({
         onChange={(e) => setNickname(e.target.value)}
         placeholder="닉네임을 입력해줘"
       />
+
+      <label className={styles.label} htmlFor="age">
+        나이 (선택)
+      </label>
+      <input
+        id="age"
+        type="number"
+        min={1}
+        max={19}
+        inputMode="numeric"
+        className={styles.input}
+        value={age}
+        onChange={(e) => {
+          setAge(e.target.value);
+          setAgeError(false);
+        }}
+        placeholder="예: 10"
+      />
+      <p className={ageError ? styles.ageError : styles.ageHint}>
+        {ageError
+          ? "나이는 1살부터 19살까지 숫자로 입력해줘."
+          : "AI가 나이에 맞는 쉬운 낱말로 설명하는 데만 써요."}
+      </p>
 
       <label className={styles.label}>아바타 고르기</label>
       <div className={styles.avatarGrid}>

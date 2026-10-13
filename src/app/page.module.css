@@ -184,35 +184,6 @@
   box-shadow: 0 12px 32px rgba(66, 71, 112, 0.08);
 }
 
-.ageRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  align-self: flex-start;
-}
-
-.ageLabel {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.ageInput {
-  width: 88px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
-  color: var(--text-primary);
-  font-size: 15px;
-  text-align: center;
-}
-
-.ageUnit {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
 .questionInput {
   width: 100%;
   padding: 14px 16px;
@@ -226,7 +197,6 @@
   resize: none;
 }
 
-.ageInput:focus,
 .questionInput:focus {
   outline: none;
   border-color: #9168c0;
@@ -339,6 +309,16 @@
     border-color: #9168c0;
     transform: translateY(-1px);
   }
+}
+
+.footer {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.footerLink {
+  color: var(--text-secondary);
+  text-decoration: underline;
 }
 
 .mediaSection {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./SpeechCheck.module.css";
 import { playErrorBeep, playSuccessDing } from "./sound";
+import { isCloseEnough, missedWords } from "../lib/speechMatch";
 
 type SpeechRecognitionResultLike = {
   isFinal: boolean;
@@ -34,8 +35,11 @@ type WindowWithSpeech = Window & {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
-function normalize(text: string) {
-  return text.replace(/[\s.,!?~'"`]/g, "");
+
+function correctMessage(missed: string[]): string {
+  return missed.length === 0
+    ? "소리 내어 정확하게 읽었어! 참 잘했어요."
+    : `거의 정확해! 잘했어요. (‘${missed.join("’, ‘")}’ 부분은 조금 다르게 들렸어)`;
 }
 
 export default function SpeechCheck({
@@ -43,12 +47,15 @@ export default function SpeechCheck({
   onCorrect,
 }: {
   target: string;
-  onCorrect: () => void;
+  /** Receives the praise to show — the parent usually swaps this component
+   * out on success, so it has to display the message itself. */
+  onCorrect: (message: string) => void;
 }) {
   const [supported, setSupported] = useState(true);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [result, setResult] = useState<"idle" | "correct" | "wrong">("idle");
+  const [missed, setMissed] = useState<string[]>([]);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
@@ -75,11 +82,13 @@ export default function SpeechCheck({
       setTranscript(text);
 
       if (isFinal) {
-        const isCorrect = normalize(text) === normalize(target);
+        const isCorrect = isCloseEnough(text, target);
+        const missedNow = missedWords(target, text);
+        setMissed(missedNow);
         if (isCorrect) {
           setResult("correct");
           playSuccessDing();
-          onCorrect();
+          onCorrect(correctMessage(missedNow));
         } else {
           setResult("wrong");
           playErrorBeep();
@@ -98,6 +107,7 @@ export default function SpeechCheck({
     if (!recognitionRef.current) return;
     setTranscript("");
     setResult("idle");
+    setMissed([]);
     setListening(true);
     recognitionRef.current.start();
   }
@@ -125,15 +135,25 @@ export default function SpeechCheck({
         {listening ? "🎙️ 듣는 중... (누르면 멈춤)" : "🎤 소리 내어 읽기"}
       </button>
 
+      <p className={styles.privacyNote}>
+        🔒 마이크를 켜면 목소리를 글자로 바꾸기 위해 브라우저 회사(예: 크롬은
+        Google)의 음성 인식 서버로 목소리가 보내질 수 있어요. MG스터디는 목소리를
+        저장하지 않고, 바뀐 글자도 이 화면에서만 확인해요.
+      </p>
+
       {transcript && <p className={styles.transcript}>“{transcript}”</p>}
 
       {result === "correct" && (
-        <p className={styles.voiceCorrect}>정확하게 읽었어! 참 잘했어요.</p>
+        <p className={styles.voiceCorrect}>{correctMessage(missed)}</p>
       )}
       {result === "wrong" && (
         <div className={styles.wrongBanner}>
           <span aria-hidden="true">⚠</span>
-          <span>다르게 읽은 것 같아. 다시 읽어볼까?</span>
+          <span>
+            {missed.length > 0
+              ? `‘${missed.join("’, ‘")}’ 부분이 다르게 들렸어. 다시 읽어볼까?`
+              : "다르게 읽은 것 같아. 다시 읽어볼까?"}
+          </span>
         </div>
       )}
     </div>

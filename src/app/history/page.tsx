@@ -49,7 +49,7 @@ export default function HistoryPage() {
               <div className={styles.historyInfo}>
                 <p className={styles.historyQuestion}>{item.question}</p>
                 <p className={styles.historyMeta}>
-                  {item.age}살 ·{" "}
+                  {item.age !== null && `${item.age}살 · `}
                   {new Date(item.date).toLocaleString("ko-KR")}
                 </p>
               </div>

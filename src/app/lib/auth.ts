@@ -21,6 +21,8 @@ export type Account = {
   email: string;
   nickname: string;
   avatar: string;
+  /** Optional; only used to tune the AI's vocabulary level. */
+  age: number | null;
 };
 
 export type HistoryEntry = { question: string; age: number | null; date: string };
@@ -48,6 +50,7 @@ export async function signup(params: {
   name: string;
   email: string;
   password: string;
+  age?: number;
 }): Promise<Account> {
   const res = await fetch(`${config.apiUrl}/auth/signup`, {
     method: "POST",
@@ -95,6 +98,7 @@ export async function getAccount(): Promise<Account | null> {
 export async function updateProfile(updates: {
   nickname?: string;
   avatar?: string;
+  age?: number;
 }): Promise<Account> {
   const res = await fetch(`${config.apiUrl}/auth/me`, {
     method: "PATCH",

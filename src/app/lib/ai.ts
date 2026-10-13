@@ -1,63 +1,5 @@
 import { config } from "@/config";
 
-export type CheckQuestionResult = {
-  isQuestion: boolean;
-  message: string;
-};
-
-/** 백엔드(mgstudy-api)의 POST /ai/check-question 호출: 입력이 진짜 질문인지 AI로 확인 */
-export async function checkQuestion(
-  question: string,
-  age?: number
-): Promise<CheckQuestionResult> {
-  const res = await fetch(`${config.apiUrl}/ai/check-question`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, age }),
-  });
-  if (!res.ok) throw new Error(`질문 확인 요청 실패: ${res.status}`);
-  const data = await res.json();
-  return { isQuestion: data.is_question, message: data.message };
-}
-
-/** 백엔드의 POST /ai/compose-question 호출: 답변 조각들을 완성된 질문 한 문장으로 종합 */
-export async function composeQuestion(params: {
-  originalQuestion: string;
-  frameworkLabel: string;
-  answers: string[];
-  age?: number;
-}): Promise<string> {
-  const res = await fetch(`${config.apiUrl}/ai/compose-question`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      original_question: params.originalQuestion,
-      framework_label: params.frameworkLabel,
-      answers: params.answers,
-      age: params.age,
-    }),
-  });
-  if (!res.ok) throw new Error(`질문 종합 요청 실패: ${res.status}`);
-  const data = await res.json();
-  return data.question as string;
-}
-
-/** 백엔드의 POST /ai/suggest-advanced-question 호출: 원래 질문보다 한 단계
- * 더 깊은 심화 질문을 추천 */
-export async function suggestAdvancedQuestion(
-  question: string,
-  age?: number
-): Promise<string> {
-  const res = await fetch(`${config.apiUrl}/ai/suggest-advanced-question`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, age }),
-  });
-  if (!res.ok) throw new Error(`심화 질문 요청 실패: ${res.status}`);
-  const data = await res.json();
-  return data.question as string;
-}
-
 export type QuizOption = { id: string; label: string; value: string };
 
 export type Quiz = {
@@ -80,34 +22,61 @@ type RawQuizStep = {
   correct_msg: string;
 };
 
-/** 백엔드의 POST /ai/generate-quiz 호출: 아이의 실제 질문 주제에 맞는 3단계
- * 퀴즈(육하원칙/원인과 결과)와 최종 설명을 생성 */
-export async function generateQuiz(params: {
-  question: string;
-  framework: string;
-  age?: number;
-}): Promise<{ quizzes: Quiz[]; answer: string }> {
-  const res = await fetch(`${config.apiUrl}/ai/generate-quiz`, {
+export type AnalyzeQuestionResult = {
+  isQuestion: boolean;
+  message: string;
+  quizzes: Quiz[];
+  answer: string;
+};
+
+/** 백엔드(mgstudy-api)의 POST /ai/analyze-question 호출: 질문인지 확인하고,
+ * 질문이면 그 질문에서 막연한 부분 세 곳을 구체화하는 퀴즈와 설명을 한 번에 받음 */
+export async function analyzeQuestion(
+  question: string,
+  age?: number
+): Promise<AnalyzeQuestionResult> {
+  const res = await fetch(`${config.apiUrl}/ai/analyze-question`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      question: params.question,
-      framework: params.framework,
-      age: params.age,
-    }),
+    body: JSON.stringify({ question, age }),
   });
-  if (!res.ok) throw new Error(`퀴즈 생성 요청 실패: ${res.status}`);
-  const data: { quizzes: RawQuizStep[]; answer: string } = await res.json();
-  const quizzes: Quiz[] = data.quizzes.map((q) => ({
-    id: q.id,
-    title: q.title,
-    desc: q.desc,
-    options: q.options,
-    correctId: q.correct_id,
-    wrongMsg: q.wrong_msg,
-    correctMsg: q.correct_msg,
-  }));
-  return { quizzes, answer: data.answer };
+  if (!res.ok) throw new Error(`질문 분석 요청 실패: ${res.status}`);
+  const data: {
+    is_question: boolean;
+    message: string;
+    quizzes: RawQuizStep[];
+    answer: string;
+  } = await res.json();
+  return {
+    isQuestion: data.is_question,
+    message: data.message,
+    quizzes: data.quizzes.map((q) => ({
+      id: q.id,
+      title: q.title,
+      desc: q.desc,
+      options: q.options,
+      correctId: q.correct_id,
+      wrongMsg: q.wrong_msg,
+      correctMsg: q.correct_msg,
+    })),
+    answer: data.answer,
+  };
+}
+
+/** 백엔드의 POST /ai/suggest-advanced-question 호출: 원래 질문보다 한 단계
+ * 더 깊은 심화 질문을 추천 */
+export async function suggestAdvancedQuestion(
+  question: string,
+  age?: number
+): Promise<string> {
+  const res = await fetch(`${config.apiUrl}/ai/suggest-advanced-question`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, age }),
+  });
+  if (!res.ok) throw new Error(`심화 질문 요청 실패: ${res.status}`);
+  const data = await res.json();
+  return data.question as string;
 }
 
 export type CheckCompositionResult = {

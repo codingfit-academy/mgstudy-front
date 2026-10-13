@@ -82,8 +82,8 @@ export default function AboutPage() {
             </span>
             <h3 className={styles.aboutCardTitle}>질문을 다시 잘 만들어요</h3>
             <p className={styles.aboutCardText}>
-              짧고 서투른 질문을 육하원칙 등 다양한 방식으로 하나씩
-              채워가며, 훨씬 더 또렷하고 제대로 된 질문으로 완성해요.
+              짧고 서투른 질문에서 대상·때·장소·이유처럼 막연한 부분을
+              AI가 찾아주면, 하나씩 채워가며 또렷한 질문으로 완성해요.
             </p>
           </div>
 
