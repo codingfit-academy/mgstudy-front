@@ -5,8 +5,8 @@
  *
  *   import { config, getPublicConfig } from "@/config"
  *
- * - config.apiUrl       : 배포 시 docker-compose 가 NEXT_PUBLIC_API_URL 을 자동 설정.
- *                         로컬은 .env.local 에서 지정 (.env.local.example 참고)
+ * - config.apiUrl       : NEXT_PUBLIC_API_URL 은 빌드 시점에 브라우저 JS에 박혀 들어감.
+ *                         배포 값은 .env.production, 로컬은 .env.local (.env.local.example 참고)
  * - getPublicConfig()   : api 의 GET /config (지도 키 등 공개 값) 조회
  *
  * ⚠ 브라우저에 노출되는 값은 반드시 NEXT_PUBLIC_ 접두사가 있어야 합니다.
